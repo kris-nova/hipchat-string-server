@@ -48,7 +48,14 @@ You can now kill the pid that was running the daemon
 
     kill <pid>
 
-# Notes
+# API
+
+The daemon will listen for records against the */parse* endpoint. The API only accepts a single parameter *input* with a value of a URL encoded string.
+
+For example, if you wanted to send a request to a daemon running on localhost and listening on port 1313 with the input string *"Hey @Kris!"* :
+
+    http://localhost:1313/parse?input=Hey%20%40Kris!
+
 
 The server and test program default to port 1313
 To change the port add the --port <num> flag when running the binaries.
