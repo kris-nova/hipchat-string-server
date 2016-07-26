@@ -1,9 +1,5 @@
 // test.go
 //
-// Will run a number of test cases against the provided hipchat-string-server library, as well as running
-// the same test cases against a listening HTTP socket. Both in unique goroutines.
-// Will assert expected responses from each method of testing.
-//
 // Running the program will exit with the following exit codes: (See STDOUT for more information.)
 //	0    All tests passed.
 // 	1+   One or more tests failed. The exit code will correspond to the number of failures.
@@ -45,13 +41,12 @@ type testCase struct {
 }
 
 
-// This main() function just runs all of the test cases, and then will output the results
 func main() {
 	handleArgs()
-	expr := hipchat_string_server.Response{} //Init empty test case
-	tr := testResults{} //Init new testResults struct
+	expr := hipchat_string_server.Response{}
+	tr := testResults{}
+	defer tr.out()
 	tr.tested = make(chan int)
-	// Verify the server is running
 	_, err := http.Get(fmt.Sprintf("http://localhost:%d/parse", port))
 	if err != nil {
 		fmt.Printf("Unable to reach server. Will not run server tests!\n")
@@ -123,9 +118,6 @@ func main() {
 			Title: "Google"}},
 	}
 	tr.test("URLs Edge Cases", "a!@#!(*http://google.com", expr)
-
-	// Lets see what happened
-	tr.out()
 }
 
 func (tr *testResults) test(name, input string, expr hipchat_string_server.Response) {
@@ -184,9 +176,7 @@ func (tr *testResults) testServer(name, input string, expr hipchat_string_server
 	tr.tested <- 1
 }
 
-// A simple test function to compare an expected response struct to an actual response struct
 func (tr *testResults) testLibrary(name, input string, expr hipchat_string_server.Response) {
-	// Init the testCase
 	testCase := testCase{
 		success: false,
 		input: input,
@@ -195,7 +185,6 @@ func (tr *testResults) testLibrary(name, input string, expr hipchat_string_serve
 	}
 	actr, err := hipchat_string_server.ParseString(input) // Get the actual response
 	if err != nil {
-		// This is beyond a major problem
 		fmt.Printf("Unable to call ParseString()! Major Error!\n")
 		fmt.Println(err.Error())
 		os.Exit(-1)
@@ -203,11 +192,9 @@ func (tr *testResults) testLibrary(name, input string, expr hipchat_string_serve
 	testCase.actualResponse = &actr // Add the response to the testCase
 
 	if compare(testCase.expectedResponse, testCase.actualResponse) {
-		//Success!
 		testCase.success = true
 		tr.successes = append(tr.successes, &testCase)
 	} else {
-		//Failure!
 		tr.failures = append(tr.failures, &testCase)
 	}
 	tr.tested <- 1
@@ -241,8 +228,6 @@ func (tr *testResults) out() {
 	os.Exit(len(tr.failures)) //We had a test fail, so exit with the number of failures
 }
 
-// This in an intersting compare function. This will assert that the two structs contain the same data
-// without caring about their order.
 func compare(a, b *hipchat_string_server.Response) bool {
 	//Mentions
 	f := false

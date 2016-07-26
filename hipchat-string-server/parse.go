@@ -2,18 +2,6 @@
 //
 // This is the file that contains all logic for actually parsing a single string and returning a response struct
 //
-// The algorithm here makes a few assumptions, they are :
-// 	1. That all input strings contain 1 or more words.
-// 	2. That all mentions, emoticons, or links are contained within a single word.
-//
-// The basic logic of the algorithm is :
-// 	1. Break down the input into words. Where a word is a string of text delimited by one or more spaces.
-//	2. Create channels for each goroutine to report back on
-// 	3. Iterate over the words, checking each word for a mention, and emoticon, or a link in a unique goroutine.
-//	4. If a mention, emoticon, or link is found a TOTAL parse needs to be handled, and then the goroutine
-//		can report back over it's channel.
-//      5. As soon as all goroutines have reported back the parse is over and can finally return
-//
 // Author: Kris Childress <kris@nivenly.com>
 
 package hipchat_string_server
@@ -68,26 +56,22 @@ type linkBack struct {
 // CPU cycles.
 //
 // This function hard codes a timeout to 3 seconds. To change this just update the timeout := 3 line
-//
-// Returns (Response{}, err)
-//
 func ParseString(input string) (Response, error) {
-	r := Response{} //New response for every call
-	e := errors.New("") //New possible error every call
-	timeout := 3 //Define timeout in seconds - 3 Should be plenty
+	r := Response{}
+	e := errors.New("")
+	timeout := 3 //Seconds
 	hlog := GetLogger()
-	words := strings.Split(input, " ") //Split on a single space.. empty words will be ignored
+	words := strings.Split(input, " ")
 	wl := len(words)
 	hlog.Debug.Printf("Parsing %d words", wl)
-	total := 0 //The total number of parsed words
-	// Channels for each type
+	total := 0
+
+	// Channels
 	mch := make(chan mentionBack)
 	ech := make(chan emoticonBack)
 	lch := make(chan linkBack)
 
-	// Goroutine for each word with it's own channel
 	for _, word := range (words) {
-		// Skip non-words
 		if word == " " {
 			continue
 		}
@@ -107,7 +91,6 @@ func ParseString(input string) (Response, error) {
 
 	tch := getTimeout(timeout)
 	hlog.Debug.Printf("Setting timeout: %d seconds", timeout)
-	// Read responses back from goroutines until we have read them all or we timeout
 	read := 0
 	for read < total && read != -1 {
 		select {
@@ -131,7 +114,7 @@ func ParseString(input string) (Response, error) {
 			break
 		case t := <-tch:
 			if t {
-				read = -1 // Break out of the loop, we timed out
+				read = -1
 				e = getErrorAndLog(fmt.Sprintf("Major Timeout. Waiting more than %d seconds for response in ParseString()", timeout))
 				r = Response{} // We HAVE to ignore all parsed data as this request is completely invalid now
 			}
@@ -139,13 +122,11 @@ func ParseString(input string) (Response, error) {
 		}
 	}
 
-	//Cleanup channels
 	hlog.Debug.Printf("Cleaning up channels..")
 	close(mch)
 	close(ech)
 	close(lch)
 
-	// Return values
 	if read == -1 {
 		return r, e
 	}
@@ -153,29 +134,21 @@ func ParseString(input string) (Response, error) {
 }
 
 // Unique goroutine that will look for a mention in a string
-//
-// Notes:
-// It's a mention if
-// 1. Contains @
-// 2. Ends with a alphanumeric character
-// 2a. Ends with non-alphanumeric a character other than space. This needs to be ignored from the mention in general
 func parseMention(str string, ch chan mentionBack) {
 	brkChars := ",;-.!?/@<>[]{}_=+#$%^&*()'\"\\"
 	found := false
-	l := len(str) //Length of the string starting at 1
-	li := l - 1 //Length of the string starting at 0 to match our i index
+	l := len(str)
+	li := l - 1
 	val := ""
 	for i, rune := range (str) {
 		char := string(rune)
 		if char == "@" && i != li {
-			// We have an @ and this is not the last char
 			found = true
 			continue
 		}
 		if found {
-			//Check for a breaking character
 			if !strings.Contains(brkChars, char) {
-				val = val + char //Append the current val
+				val = val + char
 			} else {
 				break
 			}
@@ -190,10 +163,6 @@ func parseMention(str string, ch chan mentionBack) {
 }
 
 // Unique goroutine that will look for an emoticon in a string
-//
-// Notes:
-// You only need to consider 'custom' emoticons which are alphanumeric strings, no longer than 15 characters, contained in parenthesis.
-// You can assume that anything matching this format is an emoticon.
 func parseEmoticon(str string, ch chan emoticonBack) {
 	brkChars := ",;-.!?/@<>[]{}_=+#$%^&*('\"\\"
 	found := false
@@ -213,9 +182,9 @@ func parseEmoticon(str string, ch chan emoticonBack) {
 			if char == ")" {
 				break
 			} else if !strings.Contains(brkChars, char) {
-				val = val + char //Append the current val
+				val = val + char
 			} else {
-				found = false // This never ended
+				found = false
 			}
 		}
 	}
@@ -261,7 +230,6 @@ func getTitleFromUrl(url string) string {
 		return ""
 	}
 	bodyStr := string(body)
-	//Find our opening <title>
 	bspl := strings.Split(bodyStr, "<title>")
 	if len(bspl) < 2 {
 		hlog.Warning.Printf("Unable to find <title> tag in page content for url %s", url)
@@ -291,7 +259,6 @@ func getErrorAndLog(str string) error {
 	return e
 }
 
-// Handy for comparing link structs together
 func (l *Link) ToHash() string {
 	data := []byte(fmt.Sprintf("%#v", l))
 	return fmt.Sprintf("%x", md5.Sum(data))

@@ -30,7 +30,6 @@ type hss_logger struct {
 	Critical *log.Logger
 }
 
-// Keep this public in case we want to call it later for a unique use case
 func NewLogger(dh, ih, wh, eh, ch io.Writer) hss_logger {
 	l := hss_logger{}
 	l.Debug = log.New(dh, "Debug: ", log.Ldate | log.Ltime | log.Lshortfile)
@@ -46,7 +45,6 @@ func SetLogger(hlog hss_logger) {
 	hssl_init = true
 }
 
-// Basic static factory
 func GetLogger() hss_logger {
 	if hssl_init == false {
 		hssl = NewLogger(os.Stdout, os.Stdout, os.Stdout, os.Stderr, os.Stderr)

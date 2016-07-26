@@ -32,6 +32,6 @@ func Listen(port int) {
 	hlog := GetLogger()
 	hlog.Debug.Printf("Starting HipChat String Server.. Listening on localhost:%d", port)
 	http.HandleFunc("/parse", parse)
-	hlog.Debug.Printf("Example GET request: http://localhost:%d/parse?input=@kris", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil) //Concurrent requests handled! Thanks go
+
 }
